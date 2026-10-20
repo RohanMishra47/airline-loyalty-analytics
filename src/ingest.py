@@ -2,36 +2,52 @@ import pandas as pd
 import sqlite3
 from pathlib import Path
 
-conn = sqlite3.connect("data/loyalty.db")
 
-csv_folder = Path("data/raw")
+def ingest_csv_files(db_path="data/loyalty.db", csv_folder_path="data/raw"):
+    """
+    Ingest CSV files from a folder into a SQLite database.
 
-table_names = {
-    "Calendar.csv": "raw_calendar",
-    "Customer Loyalty History.csv": "raw_loyalty_history",
-    "Customer Flight Activity.csv": "raw_flight_activity",
-    "Airline Loyalty Data Dictionary.csv": "raw_data_dictionary",
-}
+    Args:
+        db_path: Path to the SQLite database file
+        csv_folder_path: Path to the folder containing CSV files
+    """
+    conn = sqlite3.connect(db_path)
+    csv_folder = Path(csv_folder_path)
 
-for csv_file in csv_folder.glob("*.csv"):
-    table_name = table_names.get(csv_file.name)
+    table_names = {
+        "Calendar.csv": "raw_calendar",
+        "Customer Loyalty History.csv": "raw_loyalty_history",
+        "Customer Flight Activity.csv": "raw_flight_activity",
+        "Airline Loyalty Data Dictionary.csv": "raw_data_dictionary",
+    }
 
-    df = pd.read_csv(csv_file)
-    csv_rows = len(df)
+    try:
+        for csv_file in csv_folder.glob("*.csv"):
+            table_name = table_names.get(csv_file.name)
 
-    df.to_sql(table_name, conn, if_exists="replace", index=False)
+            df = pd.read_csv(csv_file)
+            csv_rows = len(df)
 
-    cursor = conn.execute(f"SELECT COUNT(*) FROM [{table_name}]")
-    db_rows = cursor.fetchone()[0]
+            df.to_sql(table_name, conn, if_exists="replace", index=False)
 
-    # Compare
-    if csv_rows == db_rows:
-        status = "✓ MATCH"
-    else:
-        status = "✗ MISMATCH"
+            cursor = conn.execute(f"SELECT COUNT(*) FROM [{table_name}]")
+            db_rows = cursor.fetchone()[0]
 
-    print(f"{table_name}: " f"CSV = {csv_rows:,}, " f"SQLite = {db_rows:,} → {status}")
+            # Compare
+            if csv_rows == db_rows:
+                status = "✓ MATCH"
+            else:
+                status = "✗ MISMATCH"
 
-    print(f"Imported {csv_file.name} -> {table_name} ({len(df):,} rows)")
+            print(
+                f"{table_name}: "
+                f"CSV = {csv_rows:,}, "
+                f"SQLite = {db_rows:,} → {status}"
+            )
+            print(f"Imported {csv_file.name} -> {table_name} ({len(df):,} rows)")
+    finally:
+        conn.close()
 
-conn.close()
+
+if __name__ == "__main__":
+    ingest_csv_files()
